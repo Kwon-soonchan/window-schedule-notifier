@@ -1,90 +1,104 @@
 import javax.swing.*;
 import java.awt.*;
-import java.io.IOException; // ★★★ 파일 쓰기를 위해 추가
-import java.nio.file.Files; // ★★★ 파일 쓰기를 위해 추가
-import java.nio.file.Path; // ★★★ 파일 쓰기를 위해 추가
-import java.nio.file.Paths; // ★★★ 파일 쓰기를 위해 추가
-import java.nio.file.StandardOpenOption; // ★★★ 파일 쓰기를 위해 추가
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.util.List; // ★★★ 파일 읽기를 위해 추가
 
 public class ScheduleManagerUI {
 
+    // JTextArea를 다른 메소드에서도 접근할 수 있게 필드로 뺍니다.
+    private static JTextArea scheduleTextArea;
+    private static final Path schedulePath = Paths.get("schedule.txt"); // 파일 경로도 필드로
+
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                createAndShowGUI();
-            }
-        });
+        SwingUtilities.invokeLater(() -> createAndShowGUI());
     }
 
     private static void createAndShowGUI() {
-        // --- 1~5번까지는 이전 코드와 동일 ---
         JFrame frame = new JFrame("일정 관리자");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(400, 300);
+        frame.setSize(450, 500); // ★★★ 창 크기를 더 크게 조정
         frame.setLocationRelativeTo(null);
 
-        JPanel panel = new JPanel();
-        panel.setLayout(new FlowLayout());
+        // --- 1. 상단 패널 (입력용) ---
+        JPanel inputPanel = new JPanel();
+        inputPanel.setLayout(new FlowLayout());
 
         JLabel label = new JLabel("새 일정 (예: 14:30,제목,내용)");
         JTextField textField = new JTextField(25);
         JButton addButton = new JButton("추가하기");
 
-        panel.add(label);
-        panel.add(textField);
-        panel.add(addButton);
+        inputPanel.add(label);
+        inputPanel.add(textField);
+        inputPanel.add(addButton);
 
-        frame.add(panel);
-        frame.setVisible(true);
+        // --- 2. ★★★ 중앙 패널 (목록 표시용) ★★★ ---
+        scheduleTextArea = new JTextArea(20, 35); // 20줄, 35 글자 크기
+        scheduleTextArea.setEditable(false); // ★ 사용자가 수정 못하게 잠그기
+        JScrollPane scrollPane = new JScrollPane(scheduleTextArea); // 스크롤바 추가
 
-        // --- 7. ★★★ "추가하기" 버튼 클릭 이벤트 (활성화) ★★★ ---
+        // --- 3. 전체 레이아웃 설정 ---
+        // 창의 '북쪽'에 inputPanel, '중앙'에 scrollPane을 배치
+        frame.getContentPane().add(inputPanel, BorderLayout.NORTH);
+        frame.getContentPane().add(scrollPane, BorderLayout.CENTER);
+
+        // --- 4. (필수) UI가 켜질 때 파일 내용을 불러오는 메소드 실행 ---
+        loadSchedules();
+
+        // --- 5. "추가하기" 버튼 클릭 이벤트 ---
         addButton.addActionListener(e -> {
-            String newSchedule = textField.getText(); // 1. 텍스트필드 내용 가져오기
-
-            // 2. 내용이 비어있지 않은지 간단히 확인
+            String newSchedule = textField.getText();
             if (newSchedule == null || newSchedule.trim().isEmpty()) {
-                // 사용자에게 경고창 띄우기
-                JOptionPane.showMessageDialog(frame,
-                        "내용을 입력해주세요!",
-                        "경고",
-                        JOptionPane.WARNING_MESSAGE);
-                return; // 아무것도 안 함
+                JOptionPane.showMessageDialog(frame, "내용을 입력해주세요!", "경고", JOptionPane.WARNING_MESSAGE);
+                return;
             }
 
-            // 3. 파일에 쓰기
-            writeToFile(newSchedule);
+            writeToFile(newSchedule); // 파일에 쓰기
 
-            // 4. 사용자에게 성공 알림창 띄우기
-            JOptionPane.showMessageDialog(frame,
-                    "'" + newSchedule + "'\n일정이 성공적으로 추가되었습니다.",
-                    "성공",
-                    JOptionPane.INFORMATION_MESSAGE);
+            // ★★★ (중요) 파일에 쓴 후, 화면 갱신 ★★★
+            loadSchedules();
 
-            // 5. 입력창 비우기
+            JOptionPane.showMessageDialog(frame, "일정이 추가되었습니다.", "성공", JOptionPane.INFORMATION_MESSAGE);
             textField.setText("");
         });
+
+        // --- 6. 창 표시 ---
+        frame.setVisible(true);
     }
 
     /**
-     * 입력받은 텍스트(String)를 schedule.txt 파일 맨 끝에 추가하는 메소드
+     * schedule.txt 파일 내용을 JTextArea에 불러오는(load) 메소드
      */
-    private static void writeToFile(String text) {
-        Path schedulePath = Paths.get("schedule.txt");
-
+    private static void loadSchedules() {
         try {
-            // ★★★ 파일에 내용을 추가(APPEND)합니다 ★★★
-            // StandardOpenOption.CREATE: 파일이 없으면 새로 만들기
-            // StandardOpenOption.APPEND: 파일의 맨 끝에 내용 추가하기 (덮어쓰지 않음)
-            Files.writeString(schedulePath,
-                    text + System.lineSeparator(), // 텍스트 + 줄바꿈
-                    StandardOpenOption.CREATE,
-                    StandardOpenOption.APPEND);
+            if (!Files.exists(schedulePath)) {
+                scheduleTextArea.setText("schedule.txt 파일이 없습니다.");
+                return;
+            }
+
+            // 파일의 모든 내용을 String으로 한 번에 읽어오기
+            String content = Files.readString(schedulePath);
+            scheduleTextArea.setText(content); // JTextArea에 텍스트 설정
 
         } catch (IOException e) {
-            // 실제 앱이라면 여기서 사용자에게 에러를 알려줘야 합니다.
+            scheduleTextArea.setText("일정을 불러오는 중 오류 발생:\n" + e.getMessage());
+        }
+    }
+
+    /**
+     * 파일에 쓰는 메소드 (이전과 동일)
+     */
+    private static void writeToFile(String text) {
+        try {
+            Files.writeString(schedulePath,
+                    text + System.lineSeparator(),
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.APPEND);
+        } catch (IOException e) {
             System.out.println("파일 쓰기 중 오류 발생: " + e.getMessage());
-            // (e.printStackTrace();) // 디버깅용
         }
     }
 }
