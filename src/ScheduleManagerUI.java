@@ -5,48 +5,55 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.util.List; // ★★★ 파일 읽기를 위해 추가
+import java.util.Collections; // ★★★ 정렬(Sort)을 위해 추가
+import java.util.List;
 
 public class ScheduleManagerUI {
 
-    // JTextArea를 다른 메소드에서도 접근할 수 있게 필드로 뺍니다.
     private static JTextArea scheduleTextArea;
-    private static final Path schedulePath = Paths.get("schedule.txt"); // 파일 경로도 필드로
+    private static final Path schedulePath = Paths.get("schedule.txt");
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> createAndShowGUI());
     }
 
+    /**
+     * UI를 생성하고 화면에 표시하는 메소드
+     */
+    /**
+     * UI를 생성하고 화면에 표시하는 메소드
+     */
     private static void createAndShowGUI() {
         JFrame frame = new JFrame("일정 관리자");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(450, 500); // ★★★ 창 크기를 더 크게 조정
-        frame.setLocationRelativeTo(null);
+        frame.setSize(450, 500); // 창 크기
+        frame.setLocationRelativeTo(null); // 화면 중앙
+        frame.setLayout(new BorderLayout()); // 혹시 모르니 남겨둡니다.
 
-        // --- 1. 상단 패널 (입력용) ---
-        JPanel inputPanel = new JPanel();
-        inputPanel.setLayout(new FlowLayout());
+        // --- 1. ★★★ (진단용 테스트) 상단 패널 레이아웃 변경 ★★★
+        JPanel inputPanel = new JPanel(new BorderLayout()); // FlowLayout 대신 BorderLayout 사용
 
         JLabel label = new JLabel("새 일정 (예: 14:30,제목,내용)");
         JTextField textField = new JTextField(25);
         JButton addButton = new JButton("추가하기");
 
-        inputPanel.add(label);
-        inputPanel.add(textField);
-        inputPanel.add(addButton);
+        // inputPanel에 컴포넌트 추가 (BorderLayout 방식으로)
+        inputPanel.add(label, BorderLayout.NORTH);     // 라벨을 패널의 '북쪽'
+        inputPanel.add(textField, BorderLayout.CENTER); // 텍스트필드를 '중앙'
+        inputPanel.add(addButton, BorderLayout.EAST);    // 버튼을 '동쪽'
+        // (모양은 조금 달라질 겁니다)
 
-        // --- 2. ★★★ 중앙 패널 (목록 표시용) ★★★ ---
-        scheduleTextArea = new JTextArea(20, 35); // 20줄, 35 글자 크기
-        scheduleTextArea.setEditable(false); // ★ 사용자가 수정 못하게 잠그기
-        JScrollPane scrollPane = new JScrollPane(scheduleTextArea); // 스크롤바 추가
+        // --- 2. 중앙 패널 (목록 표시용) ---
+        scheduleTextArea = new JTextArea(20, 35); // 텍스트 영역
+        scheduleTextArea.setEditable(false); // 수정 불가
+        JScrollPane scrollPane = new JScrollPane(scheduleTextArea); // 스크롤바 감싸기
 
-        // --- 3. 전체 레이아웃 설정 ---
-        // 창의 '북쪽'에 inputPanel, '중앙'에 scrollPane을 배치
+        // --- 3. 핵심: 전체 레이아웃 설정 ---
         frame.getContentPane().add(inputPanel, BorderLayout.NORTH);
         frame.getContentPane().add(scrollPane, BorderLayout.CENTER);
 
-        // --- 4. (필수) UI가 켜질 때 파일 내용을 불러오는 메소드 실행 ---
-        loadSchedules();
+        // --- 4. UI 켜질 때 파일 내용 불러오기 ---
+        loadSchedules(); // (정렬 기능이 포함된 메소드)
 
         // --- 5. "추가하기" 버튼 클릭 이벤트 ---
         addButton.addActionListener(e -> {
@@ -56,13 +63,11 @@ public class ScheduleManagerUI {
                 return;
             }
 
-            writeToFile(newSchedule); // 파일에 쓰기
-
-            // ★★★ (중요) 파일에 쓴 후, 화면 갱신 ★★★
-            loadSchedules();
+            writeToFile(newSchedule); // 파일 쓰기
+            loadSchedules(); // 화면 갱신 (정렬 포함)
 
             JOptionPane.showMessageDialog(frame, "일정이 추가되었습니다.", "성공", JOptionPane.INFORMATION_MESSAGE);
-            textField.setText("");
+            textField.setText(""); // 입력창 비우기
         });
 
         // --- 6. 창 표시 ---
@@ -70,7 +75,7 @@ public class ScheduleManagerUI {
     }
 
     /**
-     * schedule.txt 파일 내용을 JTextArea에 불러오는(load) 메소드
+     * ★★★ (수정됨) schedule.txt 파일 내용을 '정렬해서' JTextArea에 불러오는 메소드
      */
     private static void loadSchedules() {
         try {
@@ -79,9 +84,17 @@ public class ScheduleManagerUI {
                 return;
             }
 
-            // 파일의 모든 내용을 String으로 한 번에 읽어오기
-            String content = Files.readString(schedulePath);
-            scheduleTextArea.setText(content); // JTextArea에 텍스트 설정
+            // 1. 파일의 모든 라인을 List<String>으로 읽어옵니다.
+            List<String> lines = Files.readAllLines(schedulePath);
+
+            // 2. ★★★ 라인을 알파벳순(시간순)으로 정렬합니다. ★★★
+            Collections.sort(lines);
+
+            // 3. 정렬된 라인들을 하나의 문자열로 합칩니다. (줄바꿈 포함)
+            String sortedContent = String.join(System.lineSeparator(), lines);
+
+            // 4. JTextArea에 텍스트 설정
+            scheduleTextArea.setText(sortedContent);
 
         } catch (IOException e) {
             scheduleTextArea.setText("일정을 불러오는 중 오류 발생:\n" + e.getMessage());
