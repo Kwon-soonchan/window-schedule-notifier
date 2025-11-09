@@ -37,13 +37,19 @@ public class Main {
                 "프로그램이 백그라운드에서 실행 중입니다.");
 
 
+        LocalTime now = LocalTime.now();
+        int secondsToNextMinute = 60 - now.getSecond();
+        long initialDelay = secondsToNextMinute * 1000L;
+
+        System.out.println("타이머 : " + secondsToNextMinute + "초 후에 첫 실행 시작...");
+
         Timer timer = new Timer();
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
-                checkTime(); // 10초마다 이 함수를 실행
+                checkTime(); // 매 00초부터 1분마다 이 함수를 실행
             }
-        }, 5000, 10000); // 5초 후에 시작해서, 10초(10000ms)마다 반복
+        }, initialDelay, 60000L); // 현재시간에서 시간 계산 후, 60초(60000ms)마다 반복
     }
 
     private static void showNotification(String title, String message) {
