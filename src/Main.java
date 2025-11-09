@@ -1,12 +1,16 @@
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.time.LocalTime; // ★★★ 시간 비교를 위해 추가 ★★★
-import java.util.Timer; // ★★★ 주기적인 작업을 위해 추가 ★★★
-import java.util.TimerTask; // ★★★ 주기적인 작업을 위해 추가 ★★★
+import java.io.IOException; // ★★★ 파일 읽기를 위해 추가
+import java.nio.file.Files; // ★★★ 파일 읽기를 위해 추가
+import java.nio.file.Path; // ★★★ 파일 읽기를 위해 추가
+import java.nio.file.Paths; // ★★★ 파일 읽기를 위해 추가
+import java.time.LocalTime;
+import java.util.List; // ★★★ 파일 읽기를 위해 추가
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class Main {
 
-    // TrayIcon과 SystemTray를 다른 메소드에서도 쓸 수 있게 필드로 뺍니다.
     private static TrayIcon trayIcon;
     private static SystemTray tray;
 
@@ -17,7 +21,6 @@ public class Main {
             return;
         }
 
-        // --- 1. 트레이 아이콘 설정 (이전 코드와 거의 동일) ---
         Image image = new BufferedImage(16, 16, BufferedImage.TYPE_INT_RGB);
         tray = SystemTray.getSystemTray();
         trayIcon = new TrayIcon(image, "윈도우 일정 알리미");
@@ -30,14 +33,10 @@ public class Main {
             return;
         }
 
-        // --- 2. 알림 메시지 표시 (첫 실행 환영) ---
-        // (프로그램이 시작되었다는 것을 알려주기 위해)
         showNotification("🚀 일정 알리미 시작",
                 "프로그램이 백그라운드에서 실행 중입니다.");
 
 
-        // --- 3. ★★★ 핵심: 스케줄러 설정 ★★★ ---
-        //    "10초마다 checkTime() 함수를 실행시켜줘"
         Timer timer = new Timer();
         timer.schedule(new TimerTask() {
             @Override
@@ -45,43 +44,64 @@ public class Main {
                 checkTime(); // 10초마다 이 함수를 실행
             }
         }, 5000, 10000); // 5초 후에 시작해서, 10초(10000ms)마다 반복
-
-        // main 스레드가 종료되면 안 되므로,
-        // 이전의 sleep이나 exit(0) 코드는 모두 삭제합니다.
-        // 이제 이 프로그램은 Timer 스레드가 돌고 있어서 종료되지 않습니다.
     }
 
-    /**
-     * 알림을 띄우는 역할을 하는 별도 메소드
-     */
     private static void showNotification(String title, String message) {
         trayIcon.displayMessage(title, message, TrayIcon.MessageType.INFO);
     }
 
     /**
-     * 10초마다 호출되어 시간을 체크하는 메소드
+     * 10초마다 호출되어 schedule.txt 파일을 읽고 시간을 체크하는 메소드
      */
     private static void checkTime() {
-        // 1. 현재 시간 가져오기 (시, 분)
+        // 1. 현재 시간 (시, 분) 가져오기
         LocalTime now = LocalTime.now();
         int currentHour = now.getHour();
         int currentMinute = now.getMinute();
 
-        // 2. ★★★ 테스트할 알림 시간 설정 ★★★
-        //    (나중에는 이 부분을 파일이나 UI에서 읽어오도록 수정)
-        int targetHour = 20; // 오후 7시
-        int targetMinute = 40; // 55분
+        System.out.println("현재 시간: " + currentHour + ":" + currentMinute + " (파일 체크 중...)"); // 로그
 
-        System.out.println("현재 시간: " + currentHour + ":" + currentMinute + " (체크 중...)"); // 로그
+        // 2. schedule.txt 파일 경로 설정
+        Path schedulePath = Paths.get("schedule.txt");
 
-        // 3. 시간 비교
-        if (currentHour == targetHour && currentMinute == targetMinute) {
-            System.out.println("시간 일치! 알림 발송!"); // 로그
-            showNotification("🔔 일정 알림",
-                    "지금 " + targetHour + "시 " + targetMinute + "분입니다!");
+        // 3. 파일 읽기
+        try {
+            // (파일이 없으면 오류 대신 빈 리스트 반환)
+            if (!Files.exists(schedulePath)) {
+                System.out.println("schedule.txt 파일이 없습니다.");
+                return;
+            }
 
-            // (참고: 이대로 두면 1분 동안 10초마다 알림이 계속 울립니다.
-            //  한 번만 울리게 하는 로직은 나중에 추가합시다.)
+            // 파일의 모든 라인을 읽어온다
+            List<String> allLines = Files.readAllLines(schedulePath);
+
+            // 4. 한 줄씩 검사
+            for (String line : allLines) {
+                // 형식: "시간,제목,내용"
+                String[] parts = line.split(",", 3); // 콤마로 쪼개기 (최대 3조각)
+
+                if (parts.length < 3) continue; // 형식이 안 맞으면 무시
+
+                // 5. 파일에서 시간 파싱
+                String[] timeParts = parts[0].split(":"); // "HH:mm"
+                if (timeParts.length < 2) continue; // 시간 형식이 안 맞으면 무시
+
+                int targetHour = Integer.parseInt(timeParts[0]); // 시
+                int targetMinute = Integer.parseInt(timeParts[1]); // 분
+                String title = parts[1];
+                String message = parts[2];
+
+                // 6. 시간 비교
+                if (currentHour == targetHour && currentMinute == targetMinute) {
+                    System.out.println("일정 발견! 알림 발송: " + title); // 로그
+                    showNotification("🔔 " + title, message);
+                }
+            }
+
+        } catch (IOException e) {
+            System.out.println("파일을 읽는 중 오류 발생: " + e.getMessage());
+        } catch (NumberFormatException e) {
+            System.out.println("시간 형식이 잘못되었습니다 (HH:mm): " + e.getMessage());
         }
     }
 }
