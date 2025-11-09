@@ -1,12 +1,14 @@
-import javax.swing.*; // ★★★ Swing UI 라이브러리 ★★★
-import java.awt.*;    // "Add" 버튼 클릭 이벤트를 위한 import
+import javax.swing.*;
+import java.awt.*;
+import java.io.IOException; // ★★★ 파일 쓰기를 위해 추가
+import java.nio.file.Files; // ★★★ 파일 쓰기를 위해 추가
+import java.nio.file.Path; // ★★★ 파일 쓰기를 위해 추가
+import java.nio.file.Paths; // ★★★ 파일 쓰기를 위해 추가
+import java.nio.file.StandardOpenOption; // ★★★ 파일 쓰기를 위해 추가
 
 public class ScheduleManagerUI {
 
     public static void main(String[] args) {
-        // 1. UI를 "Event Dispatch Thread"라는 별도의 스레드에서
-        //    안전하게 실행하도록 보장하는 Swing의 공식 코드입니다.
-        //    (일단은 '이렇게 해야 한다'고 넘어가시면 됩니다)
         SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {
@@ -15,41 +17,74 @@ public class ScheduleManagerUI {
         });
     }
 
-    /**
-     * UI를 생성하고 화면에 표시하는 메소드
-     */
     private static void createAndShowGUI() {
-        // 1. 가장 바깥의 윈도우(창)을 만듭니다.
+        // --- 1~5번까지는 이전 코드와 동일 ---
         JFrame frame = new JFrame("일정 관리자");
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE); // 창 닫으면 프로그램 종료
-        frame.setSize(400, 300); // 창 크기 설정
-        frame.setLocationRelativeTo(null); // 화면 중앙에 띄우기
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(400, 300);
+        frame.setLocationRelativeTo(null);
 
-        // 2. UI 컴포넌트들을 담을 '패널'을 만듭니다.
         JPanel panel = new JPanel();
-        panel.setLayout(new FlowLayout()); // 컴포넌트를 한 줄로 쭉 나열하는 레이아웃
+        panel.setLayout(new FlowLayout());
 
-        // 3. UI 컴포넌트들 생성
         JLabel label = new JLabel("새 일정 (예: 14:30,제목,내용)");
-        JTextField textField = new JTextField(25); // 25 글자 정도 보이는 텍스트 입력칸
+        JTextField textField = new JTextField(25);
         JButton addButton = new JButton("추가하기");
 
-        // 4. 패널(쟁반)에 컴포넌트들(반찬)을 올립니다.
         panel.add(label);
         panel.add(textField);
         panel.add(addButton);
 
-        // 5. 창(frame)에 패널(panel)을 붙입니다.
         frame.add(panel);
-
-        // 6. ★★★ 마지막에 창을 화면에 보여줍니다 ★★★
         frame.setVisible(true);
 
-        // --- 7. (나중에 추가할 곳) "추가하기" 버튼 클릭 이벤트 ---
-        // addButton.addActionListener(e -> {
-        //    String newSchedule = textField.getText();
-        //    System.out.println("추가할 일정: " + newSchedule);
-        //    // 여기에 newSchedule을 schedule.txt 파일에 쓰는 로직을 넣으면 됩니다.
-        // });
+        // --- 7. ★★★ "추가하기" 버튼 클릭 이벤트 (활성화) ★★★ ---
+        addButton.addActionListener(e -> {
+            String newSchedule = textField.getText(); // 1. 텍스트필드 내용 가져오기
+
+            // 2. 내용이 비어있지 않은지 간단히 확인
+            if (newSchedule == null || newSchedule.trim().isEmpty()) {
+                // 사용자에게 경고창 띄우기
+                JOptionPane.showMessageDialog(frame,
+                        "내용을 입력해주세요!",
+                        "경고",
+                        JOptionPane.WARNING_MESSAGE);
+                return; // 아무것도 안 함
+            }
+
+            // 3. 파일에 쓰기
+            writeToFile(newSchedule);
+
+            // 4. 사용자에게 성공 알림창 띄우기
+            JOptionPane.showMessageDialog(frame,
+                    "'" + newSchedule + "'\n일정이 성공적으로 추가되었습니다.",
+                    "성공",
+                    JOptionPane.INFORMATION_MESSAGE);
+
+            // 5. 입력창 비우기
+            textField.setText("");
+        });
+    }
+
+    /**
+     * 입력받은 텍스트(String)를 schedule.txt 파일 맨 끝에 추가하는 메소드
+     */
+    private static void writeToFile(String text) {
+        Path schedulePath = Paths.get("schedule.txt");
+
+        try {
+            // ★★★ 파일에 내용을 추가(APPEND)합니다 ★★★
+            // StandardOpenOption.CREATE: 파일이 없으면 새로 만들기
+            // StandardOpenOption.APPEND: 파일의 맨 끝에 내용 추가하기 (덮어쓰지 않음)
+            Files.writeString(schedulePath,
+                    text + System.lineSeparator(), // 텍스트 + 줄바꿈
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.APPEND);
+
+        } catch (IOException e) {
+            // 실제 앱이라면 여기서 사용자에게 에러를 알려줘야 합니다.
+            System.out.println("파일 쓰기 중 오류 발생: " + e.getMessage());
+            // (e.printStackTrace();) // 디버깅용
+        }
     }
 }
