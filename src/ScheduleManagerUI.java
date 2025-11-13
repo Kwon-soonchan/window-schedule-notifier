@@ -8,6 +8,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList; // ★★★ 삭제 로직을 위해 추가
 import java.util.Collections;
 import java.util.List;
+import java.net.URL;
 
 public class ScheduleManagerUI {
 
@@ -25,6 +26,11 @@ public class ScheduleManagerUI {
         frame.setLocationRelativeTo(null);
         frame.setLayout(new BorderLayout());
 
+        // --- ★★★ 아이콘 설정 (신규) ★★★ ---
+        URL iconUrl = ScheduleManagerUI.class.getResource("/icon.png"); // ★★★ "/resource" 삭제 ★★★
+        Image icon = new ImageIcon(iconUrl).getImage();
+        frame.setIconImage(icon);
+
         // --- 1. 상단 패널 (입력용) ---
         // (이전과 동일)
         JPanel inputPanel = new JPanel(new BorderLayout());
@@ -41,7 +47,7 @@ public class ScheduleManagerUI {
         scheduleTextArea.setEditable(false);
         JScrollPane scrollPane = new JScrollPane(scheduleTextArea);
 
-        // --- 3. ★★★ 하단 패널 (삭제용) ★★★ ---
+        // --- 3. 하단 패널 (삭제용) ---
         JPanel deletePanel = new JPanel(new FlowLayout()); // 왼쪽->오른쪽
         JLabel deleteLabel = new JLabel("삭제할 시간 (예: 21:55)");
         JTextField deleteTextField = new JTextField(10); // 10글자 크기
@@ -51,7 +57,7 @@ public class ScheduleManagerUI {
         deletePanel.add(deleteTextField);
         deletePanel.add(deleteButton);
 
-        // --- 4. ★★★ 전체 레이아웃 설정 (수정) ★★★ ---
+        // --- 4. 전체 레이아웃 설정 (수정) ---
         frame.getContentPane().add(inputPanel, BorderLayout.NORTH); // 상단
         frame.getContentPane().add(scrollPane, BorderLayout.CENTER); // 중단
         frame.getContentPane().add(deletePanel, BorderLayout.SOUTH); // ★ 하단
@@ -74,7 +80,7 @@ public class ScheduleManagerUI {
             textField.setText("");
         });
 
-        // --- 7. ★★★ "삭제하기" 버튼 클릭 이벤트 (신규) ★★★ ---
+        // --- 7. "삭제하기" 버튼 클릭 이벤트 ---
         deleteButton.addActionListener(e -> {
             String timeToDelete = deleteTextField.getText(); // 1. 삭제할 시간 가져오기
 
@@ -121,7 +127,7 @@ public class ScheduleManagerUI {
                 }
             }
 
-            // 3. "살아남은" 라인들로 파일을 덮어쓴다 (중요!)
+            // 3. "살아남은" 라인들로 파일을 덮어쓴다
             // StandardOpenOption.TRUNCATE_EXISTING: 기존 내용을 다 지우고 새로 쓰기
             Files.write(schedulePath, remainingLines, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
 
