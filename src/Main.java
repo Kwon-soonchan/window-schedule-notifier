@@ -1,11 +1,14 @@
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.io.IOException; // ★★★ 파일 읽기를 위해 추가
-import java.nio.file.Files; // ★★★ 파일 읽기를 위해 추가
-import java.nio.file.Path; // ★★★ 파일 읽기를 위해 추가
-import java.nio.file.Paths; // ★★★ 파일 읽기를 위해 추가
-import java.time.LocalTime;
-import java.util.List; // ★★★ 파일 읽기를 위해 추가
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -13,6 +16,12 @@ public class Main {
 
     private static TrayIcon trayIcon;
     private static SystemTray tray;
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+    // ★★★ (수정) 사용자 홈 디렉토리에 공용 파일 경로 생성 ★★★
+    // (예: C:\Users\clove\window_schedule_notifier.txt)
+    private static final Path schedulePath = Paths.get(
+            System.getProperty("user.home"), "window_schedule_notifier.txt");
 
     public static void main(String[] args) {
 
@@ -34,80 +43,60 @@ public class Main {
         }
 
         showNotification("🚀 일정 알리미 시작",
-                "프로그램이 백그라운드에서 실행 중입니다.");
+                "프로그램이 백그라운드에서 실행 중입니다.\n파일 위치: " + schedulePath.toString()); // ★ 파일 위치 로그 추가
 
-
-        LocalTime now = LocalTime.now();
+        LocalDateTime now = LocalDateTime.now();
         int secondsToNextMinute = 60 - now.getSecond();
         long initialDelay = secondsToNextMinute * 1000L;
 
         System.out.println("타이머 : " + secondsToNextMinute + "초 후에 첫 실행 시작...");
+        System.out.println("감시 중인 파일: " + schedulePath.toString()); // ★ 파일 위치 로그 추가
 
         Timer timer = new Timer();
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
-                checkTime(); // 매 00초부터 1분마다 이 함수를 실행
+                checkTime();
             }
-        }, initialDelay, 60000L); // 현재시간에서 시간 계산 후, 60초(60000ms)마다 반복
+        }, initialDelay, 60000L);
     }
 
     private static void showNotification(String title, String message) {
         trayIcon.displayMessage(title, message, TrayIcon.MessageType.INFO);
     }
 
-    /**
-     * 10초마다 호출되어 schedule.txt 파일을 읽고 시간을 체크하는 메소드
-     */
     private static void checkTime() {
-        // 1. 현재 시간 (시, 분) 가져오기
-        LocalTime now = LocalTime.now();
-        int currentHour = now.getHour();
-        int currentMinute = now.getMinute();
+        LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES);
+        System.out.println("현재 시간: " + now.format(FORMATTER) + " (파일 체크 중...)");
 
-        System.out.println("현재 시간: " + currentHour + ":" + currentMinute + " (파일 체크 중...)"); // 로그
-
-        // 2. schedule.txt 파일 경로 설정
-        Path schedulePath = Paths.get("schedule.txt");
-
-        // 3. 파일 읽기
+        // ★ (수정) 전역 변수 schedulePath 사용 (로컬 변수 삭제)
         try {
-            // (파일이 없으면 오류 대신 빈 리스트 반환)
             if (!Files.exists(schedulePath)) {
-                System.out.println("schedule.txt 파일이 없습니다.");
+                // (파일이 없는 것은 정상이므로 로그 삭제)
                 return;
             }
 
-            // 파일의 모든 라인을 읽어온다
             List<String> allLines = Files.readAllLines(schedulePath);
 
-            // 4. 한 줄씩 검사
             for (String line : allLines) {
-                // 형식: "시간,제목,내용"
-                String[] parts = line.split(",", 3); // 콤마로 쪼개기 (최대 3조각)
+                String[] parts = line.split(",", 3);
+                if (parts.length < 3) continue;
 
-                if (parts.length < 3) continue; // 형식이 안 맞으면 무시
+                try {
+                    LocalDateTime targetDateTime = LocalDateTime.parse(parts[0], FORMATTER);
+                    String title = parts[1];
+                    String message = parts[2];
 
-                // 5. 파일에서 시간 파싱
-                String[] timeParts = parts[0].split(":"); // "HH:mm"
-                if (timeParts.length < 2) continue; // 시간 형식이 안 맞으면 무시
-
-                int targetHour = Integer.parseInt(timeParts[0]); // 시
-                int targetMinute = Integer.parseInt(timeParts[1]); // 분
-                String title = parts[1];
-                String message = parts[2];
-
-                // 6. 시간 비교
-                if (currentHour == targetHour && currentMinute == targetMinute) {
-                    System.out.println("일정 발견! 알림 발송: " + title); // 로그
-                    showNotification("🔔 " + title, message);
+                    if (now.isEqual(targetDateTime)) {
+                        System.out.println("일정 발견! 알림 발송: " + title);
+                        showNotification("🔔 " + title, message);
+                    }
+                } catch (DateTimeParseException e) {
+                    System.out.println("잘못된 날짜/시간 형식의 라인 발견: " + line);
                 }
             }
-
         } catch (IOException e) {
             System.out.println("파일을 읽는 중 오류 발생: " + e.getMessage());
-        } catch (NumberFormatException e) {
-            System.out.println("시간 형식이 잘못되었습니다 (HH:mm): " + e.getMessage());
         }
     }
 }
